@@ -16,6 +16,9 @@ int main(void) {
     InitWindow(SCREEN_WIDTH, SCREEN_HEIGHT, GAME_TITLE);
     SetTargetFPS(60);
     
+    // Disable cursor for FPS camera control
+    DisableCursor();
+    
     // Initialize 3D audio
     InitAudioDevice();
     

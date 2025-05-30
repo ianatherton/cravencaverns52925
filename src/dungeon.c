@@ -296,15 +296,15 @@ void LoadDungeonAssets(Dungeon* dungeon, int theme) {
     // For now, we'll use the raylib's built-in primitive shapes for testing
     // In a real implementation, you'd load actual model files
     
-    // Create fallback models using raylib primitives
+    // Create models using raylib primitives
     // Floor
-    dungeon->floorModel = LoadModelFromMesh(GenMeshPlane(1.0f, 1.0f, 1, 1));
+    dungeon->floorModel = LoadModelFromMesh(GenMeshPlane(1.0f, 1.0f, 2, 2)); // 2x2 segments for better texture mapping
     
-    // Wall
-    dungeon->wallModel = LoadModelFromMesh(GenMeshCube(1.0f, 1.0f, 1.0f));
+    // Wall - increased height to 3.0f
+    dungeon->wallModel = LoadModelFromMesh(GenMeshCube(1.0f, 3.0f, 1.0f));
     
-    // Door
-    dungeon->doorModel = LoadModelFromMesh(GenMeshCube(1.0f, 1.0f, 0.2f));
+    // Door - increased height to match walls
+    dungeon->doorModel = LoadModelFromMesh(GenMeshCube(1.0f, 3.0f, 0.2f));
     
     // Stairs
     dungeon->stairsUpModel = LoadModelFromMesh(GenMeshCube(1.0f, 0.5f, 1.0f));
@@ -316,25 +316,40 @@ void LoadDungeonAssets(Dungeon* dungeon, int theme) {
     // Chest
     dungeon->chestModel = LoadModelFromMesh(GenMeshCube(0.8f, 0.5f, 0.5f));
     
-    // Create fallback textures using solid colors
+    // Load actual textures for floor and walls
+    char wallTexturePath[256];
+    char floorTexturePath[256];
+    
+    // Build paths to textures
+    snprintf(wallTexturePath, sizeof(wallTexturePath), "%sdungeon/tiling_dungeon_brickwall01.png", texturesPath);
+    snprintf(floorTexturePath, sizeof(floorTexturePath), "%sdungeon/tiling_dungeon_floor01.png", texturesPath);
+    
+    // Load wall texture
+    dungeon->wallTexture = LoadTexture(wallTexturePath);
+    
+    // Load floor texture
+    dungeon->floorTexture = LoadTexture(floorTexturePath);
+    
+    // If textures couldn't be loaded, create fallbacks
+    if (dungeon->wallTexture.id == 0) {
+        Image img = GenImageColor(128, 128, (Color){128, 128, 128, 255}); // Gray
+        dungeon->wallTexture = LoadTextureFromImage(img);
+        UnloadImage(img);
+    }
+    
+    if (dungeon->floorTexture.id == 0) {
+        Image img = GenImageColor(128, 128, (Color){139, 69, 19, 255}); // Brown
+        dungeon->floorTexture = LoadTextureFromImage(img);
+        UnloadImage(img);
+    }
+    
+    // Create fallback images for other textures
     Image img;
     
-    // Floor texture (brown)
-    img = GenImageColor(128, 128, (Color){139, 69, 19, 255});
-    dungeon->floorTexture = LoadTextureFromImage(img);
-    UnloadImage(img);
+    // Door texture (dark brown) - now using wall texture instead
+    dungeon->doorTexture = dungeon->wallTexture;
     
-    // Wall texture (gray)
-    img = GenImageColor(128, 128, (Color){128, 128, 128, 255});
-    dungeon->wallTexture = LoadTextureFromImage(img);
-    UnloadImage(img);
-    
-    // Door texture (dark brown)
-    img = GenImageColor(128, 128, (Color){101, 67, 33, 255});
-    dungeon->doorTexture = LoadTextureFromImage(img);
-    UnloadImage(img);
-    
-    // Stairs texture (light gray)
+    // Stairs texture (white)
     img = GenImageColor(128, 128, (Color){200, 200, 200, 255});
     dungeon->stairsTexture = LoadTextureFromImage(img);
     UnloadImage(img);
@@ -344,19 +359,23 @@ void LoadDungeonAssets(Dungeon* dungeon, int theme) {
     dungeon->trapTexture = LoadTextureFromImage(img);
     UnloadImage(img);
     
-    // Chest texture (gold)
-    img = GenImageColor(128, 128, (Color){212, 175, 55, 255});
+    // Chest texture (yellow)
+    img = GenImageColor(128, 128, (Color){218, 165, 32, 255});
     dungeon->chestTexture = LoadTextureFromImage(img);
     UnloadImage(img);
     
-    // Set the textures to the models
-    dungeon->floorModel.materials[0].maps[MATERIAL_MAP_DIFFUSE].texture = dungeon->floorTexture;
+    // Set material for each model
     dungeon->wallModel.materials[0].maps[MATERIAL_MAP_DIFFUSE].texture = dungeon->wallTexture;
-    dungeon->doorModel.materials[0].maps[MATERIAL_MAP_DIFFUSE].texture = dungeon->doorTexture;
+    dungeon->floorModel.materials[0].maps[MATERIAL_MAP_DIFFUSE].texture = dungeon->floorTexture;
+    dungeon->doorModel.materials[0].maps[MATERIAL_MAP_DIFFUSE].texture = dungeon->wallTexture; // Use wall texture for doors
     dungeon->stairsUpModel.materials[0].maps[MATERIAL_MAP_DIFFUSE].texture = dungeon->stairsTexture;
     dungeon->stairsDownModel.materials[0].maps[MATERIAL_MAP_DIFFUSE].texture = dungeon->stairsTexture;
     dungeon->trapModel.materials[0].maps[MATERIAL_MAP_DIFFUSE].texture = dungeon->trapTexture;
     dungeon->chestModel.materials[0].maps[MATERIAL_MAP_DIFFUSE].texture = dungeon->chestTexture;
+    
+    // Configure texture wrapping for proper tiling
+    SetTextureWrap(dungeon->wallTexture, TEXTURE_WRAP_REPEAT);
+    SetTextureWrap(dungeon->floorTexture, TEXTURE_WRAP_REPEAT);
 }
 
 // Draw the dungeon
@@ -373,8 +392,8 @@ void DrawDungeon(Dungeon* dungeon) {
                     break;
                     
                 case TILE_WALL:
-                    // Draw wall
-                    DrawModel(dungeon->wallModel, (Vector3){x, 0.5f, y}, 1.0f, WHITE);
+                    // Draw wall - adjusted Y position to account for taller walls
+                    DrawModel(dungeon->wallModel, (Vector3){x, 1.5f, y}, 1.0f, WHITE);
                     break;
                     
                 case TILE_DOOR:
@@ -392,7 +411,7 @@ void DrawDungeon(Dungeon* dungeon) {
                     if (isHorizontalCorridor) {
                         // Door facing north-south
                         DrawModelEx(dungeon->doorModel, 
-                                   (Vector3){x, 0.5f, y}, 
+                                   (Vector3){x, 1.5f, y}, 
                                    (Vector3){0.0f, 1.0f, 0.0f}, 
                                    90.0f, 
                                    (Vector3){1.0f, 1.0f, 1.0f}, 
@@ -400,7 +419,7 @@ void DrawDungeon(Dungeon* dungeon) {
                     } else {
                         // Door facing east-west
                         DrawModelEx(dungeon->doorModel, 
-                                   (Vector3){x, 0.5f, y}, 
+                                   (Vector3){x, 1.5f, y}, 
                                    (Vector3){0.0f, 1.0f, 0.0f}, 
                                    0.0f, 
                                    (Vector3){1.0f, 1.0f, 1.0f}, 

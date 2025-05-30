@@ -7,7 +7,7 @@
 // Initialize player
 void InitPlayer(Player* player) {
     // Set default position
-    player->position = (Vector3){0.0f, 1.8f, 0.0f};
+    player->position = (Vector3){0.0f, 0.0f, 0.0f};
     player->velocity = (Vector3){0.0f, 0.0f, 0.0f};
     player->direction = (Vector3){0.0f, 0.0f, 1.0f};
     player->speed = 5.0f;
@@ -20,7 +20,7 @@ void InitPlayer(Player* player) {
     
     // Set camera properties
     player->cameraOffset = (Vector3){0.0f, 0.0f, 0.0f};
-    player->cameraHeight = 1.7f;
+    player->cameraHeight = 0.3f;
     
     // Initialize stats
     player->stats.health = 100;
@@ -67,11 +67,44 @@ void UpdatePlayer(Player* player, float deltaTime) {
     // Store previous position for collision checks
     Vector3 previousPosition = player->position;
     
-    // Handle rotation with mouse (this would typically be handled in the main game loop)
-    // This assumes that the mouse controls have been set up in the main loop
+    // Handle rotation with mouse
+    Vector2 mouseDelta = GetMouseDelta();
+    
+    // Apply mouse sensitivity - increased for better responsiveness
+    float mouseSensitivity = 0.003f;
+    
+    // Adjust sensitivity to make it more responsive
+    mouseSensitivity *= 2.5f;
+    
+    // Make sure mouse stays centered - essential for FPS camera control
+    if (IsWindowFocused()) {
+        SetMousePosition(GetScreenWidth()/2, GetScreenHeight()/2);
+    }
+    
+    // Update rotation angle based on mouse X movement
+    player->rotationAngle -= mouseDelta.x * mouseSensitivity;
+    
+    // Update player direction vector based on rotation angle
+    player->direction.x = sinf(player->rotationAngle);
+    player->direction.z = cosf(player->rotationAngle);
+    
+    // Add a small vertical component to the direction based on mouse Y movement
+    // This creates an effect of looking slightly up or down
+    static float verticalAngle = 0.0f;
+    verticalAngle -= mouseDelta.y * mouseSensitivity;
+    
+    // Clamp vertical angle to prevent over-rotation
+    if (verticalAngle > 0.5f) verticalAngle = 0.5f;
+    if (verticalAngle < -0.5f) verticalAngle = -0.5f;
+    
+    // Apply vertical angle to direction
+    player->direction.y = sinf(verticalAngle);
+    
+    // Normalize direction vector
+    player->direction = Vector3Normalize(player->direction);
     
     // Process movement
-    // Reset movement velocity
+    // Reset horizontal velocity
     player->velocity.x = 0;
     player->velocity.z = 0;
     
@@ -123,22 +156,16 @@ void UpdatePlayer(Player* player, float deltaTime) {
     } else {
         // Apply gravity
         player->velocity.y -= 20.0f * deltaTime;
-        
-        // Check if we hit the ground
-        if (player->position.y <= player->height / 2) {
-            player->position.y = player->height / 2;
-            player->isGrounded = true;
-            player->isJumping = false;
-        }
     }
     
-    // Update position based on velocity
-    player->position.x += player->velocity.x * deltaTime;
-    player->position.y += player->velocity.y * deltaTime;
-    player->position.z += player->velocity.z * deltaTime;
+    // Calculate new position based on velocity
+    Vector3 newPosition = player->position;
+    newPosition.x += player->velocity.x * deltaTime;
+    newPosition.y += player->velocity.y * deltaTime;
+    newPosition.z += player->velocity.z * deltaTime;
     
-    // Note: Actual collision detection with dungeon would be handled in the game.c 
-    // where the dungeon context is available
+    // Note: Actual collision detection with dungeon is handled in the game.c
+    // where the dungeon context is available, but we'll prepare the new position here
     
     // Update attack timer
     if (player->isAttacking) {

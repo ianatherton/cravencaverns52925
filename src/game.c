@@ -21,8 +21,8 @@
 void LoadGameAssets(GameState* gameState) {
     // Initialize game camera (first person view)
     gameState->camera = (Camera){
-        .position = (Vector3){ 0.0f, 1.8f, 0.0f },
-        .target = (Vector3){ 0.0f, 1.8f, 1.0f },
+        .position = (Vector3){ 0.0f, 0.3f, 0.0f },
+        .target = (Vector3){ 0.0f, 0.3f, 1.0f },
         .up = (Vector3){ 0.0f, 1.0f, 0.0f },
         .fovy = 60.0f,
         .projection = CAMERA_PERSPECTIVE
@@ -89,7 +89,43 @@ void UpdateGame(GameState* gameState, float deltaTime) {
                 // Update player
                 UpdatePlayer(gameState->player, deltaTime);
                 
-                // Update camera to follow player
+                // Store previous position for collision detection
+                Vector3 previousPosition = gameState->player->position;
+                
+                // Calculate new position based on velocity
+                Vector3 newPosition = previousPosition;
+                newPosition.x += gameState->player->velocity.x * deltaTime;
+                newPosition.y += gameState->player->velocity.y * deltaTime;
+                newPosition.z += gameState->player->velocity.z * deltaTime;
+                
+                // Collision detection with walls
+                // Check X-axis movement
+                if (IsWalkable(gameState->dungeon, newPosition.x, previousPosition.z)) {
+                    gameState->player->position.x = newPosition.x;
+                }
+                
+                // Check Z-axis movement
+                if (IsWalkable(gameState->dungeon, gameState->player->position.x, newPosition.z)) {
+                    gameState->player->position.z = newPosition.z;
+                }
+                
+                // Handle gravity and ground collision
+                if (newPosition.y < 0) {
+                    // Collision with ground
+                    gameState->player->position.y = 0;
+                    gameState->player->isGrounded = true;
+                    gameState->player->isJumping = false;
+                } else {
+                    // Apply Y movement
+                    gameState->player->position.y = newPosition.y;
+                    
+                    // If player is going down and not at ground level, they're not grounded
+                    if (gameState->player->velocity.y < 0 && gameState->player->position.y > 0) {
+                        gameState->player->isGrounded = false;
+                    }
+                }
+                
+                // Update camera to follow player at the new lower height
                 gameState->camera.position = (Vector3){
                     gameState->player->position.x,
                     gameState->player->position.y + gameState->player->cameraHeight,
