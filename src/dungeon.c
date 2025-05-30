@@ -171,7 +171,7 @@ void GenerateDungeon(Dungeon* dungeon, int width, int height, int maxRooms, int 
     AddRandomChests(dungeon, maxRooms / 2); // 50% of max rooms have chests
 }
 
-// Create a horizontal corridor between x1 and x2 at y
+// Create a horizontal corridor between x1 and x2 at y (now with adjustable width)
 void CreateHorizontalCorridor(Dungeon* dungeon, int x1, int x2, int y) {
     // Ensure x1 is less than x2
     if (x1 > x2) {
@@ -180,18 +180,26 @@ void CreateHorizontalCorridor(Dungeon* dungeon, int x1, int x2, int y) {
         x2 = temp;
     }
     
-    // Create corridor
+    // Define corridor width (now double width)
+    int corridorWidth = 2; // Was previously 1 (implicit)
+    
+    // Create wider corridor
     for (int x = x1; x <= x2; x++) {
-        if (x >= 0 && x < dungeon->width && y >= 0 && y < dungeon->height) {
-            // Only replace walls, don't overwrite floors
-            if (dungeon->tiles[x][y] == TILE_WALL) {
-                dungeon->tiles[x][y] = TILE_FLOOR;
+        for (int offset = 0; offset < corridorWidth; offset++) {
+            int currentY = y - corridorWidth/2 + offset;
+            
+            // Ensure we're inside the dungeon bounds
+            if (x >= 0 && x < dungeon->width && currentY >= 0 && currentY < dungeon->height) {
+                // Only replace walls, don't overwrite floors
+                if (dungeon->tiles[x][currentY] == TILE_WALL) {
+                    dungeon->tiles[x][currentY] = TILE_FLOOR;
+                }
             }
         }
     }
 }
 
-// Create a vertical corridor between y1 and y2 at x
+// Create a vertical corridor between y1 and y2 at x (now with adjustable width)
 void CreateVerticalCorridor(Dungeon* dungeon, int y1, int y2, int x) {
     // Ensure y1 is less than y2
     if (y1 > y2) {
@@ -200,12 +208,20 @@ void CreateVerticalCorridor(Dungeon* dungeon, int y1, int y2, int x) {
         y2 = temp;
     }
     
-    // Create corridor
+    // Define corridor width (now double width)
+    int corridorWidth = 2; // Was previously 1 (implicit)
+    
+    // Create wider corridor
     for (int y = y1; y <= y2; y++) {
-        if (x >= 0 && x < dungeon->width && y >= 0 && y < dungeon->height) {
-            // Only replace walls, don't overwrite floors
-            if (dungeon->tiles[x][y] == TILE_WALL) {
-                dungeon->tiles[x][y] = TILE_FLOOR;
+        for (int offset = 0; offset < corridorWidth; offset++) {
+            int currentX = x - corridorWidth/2 + offset;
+            
+            // Ensure we're inside the dungeon bounds
+            if (currentX >= 0 && currentX < dungeon->width && y >= 0 && y < dungeon->height) {
+                // Only replace walls, don't overwrite floors
+                if (dungeon->tiles[currentX][y] == TILE_WALL) {
+                    dungeon->tiles[currentX][y] = TILE_FLOOR;
+                }
             }
         }
     }
@@ -522,26 +538,89 @@ Vector3 GetRandomFloorPosition(Dungeon* dungeon) {
     return (Vector3){x, 0.0f, y};
 }
 
-// Check if a position is walkable
-bool IsWalkable(Dungeon* dungeon, float x, float z) {
-    // Convert floating point coordinates to integer tile coordinates
-    int tileX = (int)x;
-    int tileZ = (int)z;
-    
-    // Check if the position is inside the dungeon bounds
+// Check if a position is walkable considering the player's radius
+bool IsWalkable(Dungeon* dungeon, float x, float z, float radius) {
+    // Quick bounds check for efficiency
     if (!IsInsideDungeon(dungeon, x, z)) {
         return false;
     }
     
-    // Check if the tile is walkable
-    TileType tile = dungeon->tiles[tileX][tileZ];
+    // Reduce the collision radius for better movement feel
+    float collisionRadius = radius * 0.85f;
     
-    return (tile == TILE_FLOOR || 
-            tile == TILE_DOOR || 
-            tile == TILE_STAIRS_UP || 
-            tile == TILE_STAIRS_DOWN || 
-            tile == TILE_TRAP || 
-            tile == TILE_CHEST);
+    // We'll implement a more precise collision detection algorithm that checks
+    // multiple points around the player in a circular pattern
+    
+    // First check the center tile directly
+    int centerX = (int)floorf(x);
+    int centerZ = (int)floorf(z);
+    
+    if (dungeon->tiles[centerX][centerZ] == TILE_WALL) {
+        return false;
+    }
+    
+    // Define how many points to check around the circle
+    const int numPoints = 8;
+    
+    // Check points around the player in a circular pattern
+    for (int i = 0; i < numPoints; i++) {
+        // Calculate angle for this point
+        float angle = (float)i * (2.0f * PI / numPoints);
+        
+        // Calculate offset from player position
+        float offsetX = cosf(angle) * collisionRadius;
+        float offsetZ = sinf(angle) * collisionRadius;
+        
+        // Calculate world position to check
+        float checkX = x + offsetX;
+        float checkZ = z + offsetZ;
+        
+        // Convert to tile coordinates - use floorf to ensure proper rounding for negative values
+        int tileX = (int)floorf(checkX);
+        int tileZ = (int)floorf(checkZ);
+        
+        // Verify this point is within dungeon bounds
+        if (tileX >= 0 && tileX < dungeon->width && 
+            tileZ >= 0 && tileZ < dungeon->height) {
+            
+            // If this point is in a wall, the position is not walkable
+            if (dungeon->tiles[tileX][tileZ] == TILE_WALL) {
+                return false;
+            }
+        } else {
+            // Point is outside dungeon bounds
+            return false;
+        }
+    }
+    
+    // Additional check for handling corners better
+    // Check the four diagonal points at a slightly smaller radius
+    float cornerRadius = collisionRadius * 0.75f;
+    float diagonalOffset = cornerRadius * 0.7071f; // 0.7071 ≈ cos(45°) ≈ sin(45°)
+    
+    // Points to check for diagonal collisions
+    float cornerPoints[4][2] = {
+        {x + diagonalOffset, z + diagonalOffset}, // Top-right
+        {x - diagonalOffset, z + diagonalOffset}, // Top-left
+        {x + diagonalOffset, z - diagonalOffset}, // Bottom-right
+        {x - diagonalOffset, z - diagonalOffset}  // Bottom-left
+    };
+    
+    for (int i = 0; i < 4; i++) {
+        int tileX = (int)floorf(cornerPoints[i][0]);
+        int tileZ = (int)floorf(cornerPoints[i][1]);
+        
+        if (tileX >= 0 && tileX < dungeon->width && 
+            tileZ >= 0 && tileZ < dungeon->height) {
+            
+            if (dungeon->tiles[tileX][tileZ] == TILE_WALL) {
+                return false;
+            }
+        }
+    }
+    
+    // All checks passed, the position is walkable
+    return true;
 }
 
 // Check if a position is inside the dungeon bounds

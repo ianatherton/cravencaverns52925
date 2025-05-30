@@ -2,6 +2,7 @@
 #include "../include/game.h"
 #include "../include/player.h"
 #include <stdio.h>
+#include <math.h>
 
 // Draw all UI elements
 void DrawUI(GameState* gameState) {
@@ -232,7 +233,31 @@ void DrawMinimapUI(GameState* gameState) {
     
     if (playerX >= minimapX && playerX < minimapX + minimapSize &&
         playerY >= minimapY && playerY < minimapY + minimapSize) {
+        // Draw player as blue square
         DrawRectangle(playerX, playerY, minimapScale, minimapScale, BLUE);
+        
+        // Add a flashing white dot in the direction the player is facing
+        // Calculate the direction offset based on player direction vector
+        float dirX = gameState->player->direction.x;
+        float dirZ = gameState->player->direction.z;
+        
+        // Scale the direction vector to determine dot position
+        // The dot should be 2 units away from player position
+        int dotDistance = 2 * minimapScale;
+        int directionX = playerX + (int)(dirX * dotDistance);
+        int directionY = playerY + (int)(dirZ * dotDistance);
+        
+        // Make sure the direction indicator is within minimap bounds
+        if (directionX >= minimapX && directionX < minimapX + minimapSize &&
+            directionY >= minimapY && directionY < minimapY + minimapSize) {
+            
+            // Make the dot flash by checking the game time
+            float gameTime = GetTime();
+            if (fmodf(gameTime, 0.5f) < 0.25f) {
+                // Draw the direction indicator dot
+                DrawRectangle(directionX, directionY, minimapScale, minimapScale, WHITE);
+            }
+        }
     }
     
     // Draw minimap border

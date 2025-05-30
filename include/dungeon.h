@@ -67,7 +67,7 @@ void LoadDungeonAssets(Dungeon* dungeon, int theme);
 void UnloadDungeon(Dungeon* dungeon);
 void DrawDungeon(Dungeon* dungeon);
 Vector3 GetRandomFloorPosition(Dungeon* dungeon);
-bool IsWalkable(Dungeon* dungeon, float x, float z);
+bool IsWalkable(Dungeon* dungeon, float x, float z, float radius);
 bool IsInsideDungeon(Dungeon* dungeon, float x, float z);
 
 #endif // DUNGEON_H

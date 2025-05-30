@@ -98,15 +98,41 @@ void UpdateGame(GameState* gameState, float deltaTime) {
                 newPosition.y += gameState->player->velocity.y * deltaTime;
                 newPosition.z += gameState->player->velocity.z * deltaTime;
                 
-                // Collision detection with walls
-                // Check X-axis movement
-                if (IsWalkable(gameState->dungeon, newPosition.x, previousPosition.z)) {
+                // Advanced collision detection with sliding along walls
+                // First try to move in both X and Z directions (ideal movement)
+                if (IsWalkable(gameState->dungeon, newPosition.x, newPosition.z, gameState->player->radius)) {
+                    // Full movement is possible
                     gameState->player->position.x = newPosition.x;
-                }
-                
-                // Check Z-axis movement
-                if (IsWalkable(gameState->dungeon, gameState->player->position.x, newPosition.z)) {
                     gameState->player->position.z = newPosition.z;
+                } else {
+                    // Try X-axis movement only
+                    if (IsWalkable(gameState->dungeon, newPosition.x, previousPosition.z, gameState->player->radius)) {
+                        gameState->player->position.x = newPosition.x;
+                    }
+                    
+                    // Try Z-axis movement only
+                    if (IsWalkable(gameState->dungeon, gameState->player->position.x, newPosition.z, gameState->player->radius)) {
+                        gameState->player->position.z = newPosition.z;
+                    }
+                    
+                    // If we still couldn't move, try sliding along walls at reduced speed
+                    if (gameState->player->position.x == previousPosition.x && 
+                        gameState->player->position.z == previousPosition.z) {
+                        
+                        // Try with a smaller step (half speed) in each direction
+                        float halfStepX = previousPosition.x + (newPosition.x - previousPosition.x) * 0.5f;
+                        float halfStepZ = previousPosition.z + (newPosition.z - previousPosition.z) * 0.5f;
+                        
+                        // Try X-axis half step
+                        if (IsWalkable(gameState->dungeon, halfStepX, previousPosition.z, gameState->player->radius)) {
+                            gameState->player->position.x = halfStepX;
+                        }
+                        
+                        // Try Z-axis half step
+                        if (IsWalkable(gameState->dungeon, gameState->player->position.x, halfStepZ, gameState->player->radius)) {
+                            gameState->player->position.z = halfStepZ;
+                        }
+                    }
                 }
                 
                 // Handle gravity and ground collision
