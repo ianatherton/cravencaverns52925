@@ -360,13 +360,13 @@ void LoadDungeonAssets(Dungeon* dungeon, int theme) {
     // In a real implementation, you'd load actual model files
     
     // Create models using raylib primitives
-    // Floor
-    dungeon->floorModel = LoadModelFromMesh(GenMeshPlane(1.0f, 1.0f, 2, 2)); // 2x2 segments for better texture mapping
+    // Floor with 2x2 segments for better texture mapping
+    dungeon->floorModel = LoadModelFromMesh(GenMeshPlane(1.0f, 1.0f, 2, 2));
     
-    // Wall - increased height to 3.0f
+    // Wall - using standard cube mesh with 1x3x1 dimensions
     dungeon->wallModel = LoadModelFromMesh(GenMeshCube(1.0f, 3.0f, 1.0f));
     
-    // Ceiling - create a plane that will be positioned at the top of the walls
+    // Ceiling - create a plane with 2x2 segments for better texture mapping
     dungeon->ceilingModel = LoadModelFromMesh(GenMeshPlane(1.0f, 1.0f, 2, 2));
     
     // Door - increased height to match walls
@@ -448,6 +448,35 @@ void LoadDungeonAssets(Dungeon* dungeon, int theme) {
     // Configure texture wrapping for proper tiling
     SetTextureWrap(dungeon->wallTexture, TEXTURE_WRAP_REPEAT);
     SetTextureWrap(dungeon->floorTexture, TEXTURE_WRAP_REPEAT);
+    SetTextureWrap(dungeon->ceilingTexture, TEXTURE_WRAP_REPEAT);
+    
+    // Configure texture wrapping mode for proper tiling
+    SetTextureWrap(dungeon->wallTexture, TEXTURE_WRAP_REPEAT);  
+    SetTextureWrap(dungeon->floorTexture, TEXTURE_WRAP_REPEAT);
+    SetTextureWrap(dungeon->ceilingTexture, TEXTURE_WRAP_REPEAT);
+    
+    // Make sure textures are properly assigned to models
+    dungeon->wallModel.materials[0].maps[MATERIAL_MAP_DIFFUSE].texture = dungeon->wallTexture;
+    dungeon->floorModel.materials[0].maps[MATERIAL_MAP_DIFFUSE].texture = dungeon->floorTexture;
+    dungeon->ceilingModel.materials[0].maps[MATERIAL_MAP_DIFFUSE].texture = dungeon->ceilingTexture;
+    dungeon->doorModel.materials[0].maps[MATERIAL_MAP_DIFFUSE].texture = dungeon->wallTexture;
+    
+    // Load custom shader for wall texture tiling
+    dungeon->tilingShader = LoadShader(
+        "assets/shaders/custom_tiling.vs",   // Vertex shader
+        "assets/shaders/custom_tiling.fs"    // Fragment shader
+    );
+    
+    // Get shader locations for uniforms
+    int tilingLoc = GetShaderLocation(dungeon->tilingShader, "tiling");
+    
+    // Set shader uniform values - adjust these values to control texture tiling
+    // First value (1.0) controls horizontal tiling, second value (3.0) controls vertical tiling
+    float tilingValues[2] = { 1.0f, 3.4f };
+    SetShaderValue(dungeon->tilingShader, tilingLoc, tilingValues, SHADER_UNIFORM_VEC2);
+    
+    // Apply the shader to the wall model
+    dungeon->wallModel.materials[0].shader = dungeon->tilingShader;
 }
 
 // Draw the dungeon
@@ -607,10 +636,13 @@ void UnloadDungeon(Dungeon* dungeon) {
         dungeon->rooms = NULL;
     }
     
+    // Unload shader before models to avoid referencing freed resources
+    UnloadShader(dungeon->tilingShader);
+    
     // Unload models
-    UnloadModel(dungeon->floorModel);
     UnloadModel(dungeon->wallModel);
-    UnloadModel(dungeon->ceilingModel); // Unload ceiling model
+    UnloadModel(dungeon->floorModel);
+    UnloadModel(dungeon->ceilingModel);
     UnloadModel(dungeon->doorModel);
     UnloadModel(dungeon->stairsUpModel);
     UnloadModel(dungeon->stairsDownModel);
@@ -618,16 +650,17 @@ void UnloadDungeon(Dungeon* dungeon) {
     UnloadModel(dungeon->chestModel);
     
     // Unload textures
-    UnloadTexture(dungeon->floorTexture);
     UnloadTexture(dungeon->wallTexture);
-    // Don't unload ceiling texture separately since it shares the wall texture
-    
-    // Unload decorative props
-    UnloadProps();
+    UnloadTexture(dungeon->floorTexture);
+    // Don't unload ceiling texture separately since it's a reference to the wall texture
+    // UnloadTexture(dungeon->ceilingTexture);
     UnloadTexture(dungeon->doorTexture);
     UnloadTexture(dungeon->stairsTexture);
     UnloadTexture(dungeon->trapTexture);
     UnloadTexture(dungeon->chestTexture);
+    
+    // Unload decorative props
+    UnloadProps();
     
     // Reset dungeon properties
     dungeon->width = 0;

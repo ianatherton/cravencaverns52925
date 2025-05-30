@@ -45,7 +45,7 @@ typedef struct Dungeon {
     // Models used for dungeon rendering
     Model floorModel;
     Model wallModel;
-    Model ceilingModel; // Added ceiling model
+    Model ceilingModel; 
     Model doorModel;
     Model stairsUpModel;
     Model stairsDownModel;
@@ -55,11 +55,14 @@ typedef struct Dungeon {
     // Textures for dungeon elements
     Texture2D floorTexture;
     Texture2D wallTexture;
-    Texture2D ceilingTexture; // Added ceiling texture
+    Texture2D ceilingTexture; 
     Texture2D doorTexture;
     Texture2D stairsTexture;
     Texture2D trapTexture;
     Texture2D chestTexture;
+    
+    // Custom shader for wall texture tiling
+    Shader tilingShader;
 } Dungeon;
 
 // Dungeon generation and management functions
