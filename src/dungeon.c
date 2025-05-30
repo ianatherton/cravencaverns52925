@@ -1,4 +1,5 @@
 #include "../include/dungeon.h"
+#include "../include/dungeon_props.h"
 #include "raymath.h"
 #include <stdlib.h>
 #include <stdio.h>
@@ -82,31 +83,8 @@ void GenerateDungeon(Dungeon* dungeon, int width, int height, int maxRooms, int 
                 }
             }
             
-            // Connect to the previous room if not the first room
-            if (dungeon->roomCount > 0) {
-                // Get the center of the current and previous room
-                int newCenterX = roomX + roomWidth / 2;
-                int newCenterY = roomY + roomHeight / 2;
-                
-                Room prevRoom = dungeon->rooms[dungeon->roomCount - 1];
-                int prevCenterX = prevRoom.x + prevRoom.width / 2;
-                int prevCenterY = prevRoom.y + prevRoom.height / 2;
-                
-                // Create corridors between the rooms
-                // Randomly choose horizontal-then-vertical or vertical-then-horizontal
-                if (GetRandomValue(0, 1) == 0) {
-                    // Horizontal then vertical
-                    CreateHorizontalCorridor(dungeon, prevCenterX, newCenterX, prevCenterY);
-                    CreateVerticalCorridor(dungeon, prevCenterY, newCenterY, newCenterX);
-                } else {
-                    // Vertical then horizontal
-                    CreateVerticalCorridor(dungeon, prevCenterY, newCenterY, prevCenterX);
-                    CreateHorizontalCorridor(dungeon, prevCenterX, newCenterX, newCenterY);
-                }
-                
-                // Mark the room as connected
-                dungeon->rooms[dungeon->roomCount].connected = true;
-            }
+            // Room creation complete
+            // We'll connect all rooms later with the ConnectRooms function
             
             dungeon->roomCount++;
         }
@@ -137,7 +115,13 @@ void GenerateDungeon(Dungeon* dungeon, int width, int height, int maxRooms, int 
         }
     }
     
-    // Add some doors between corridors and rooms
+    // Connect all rooms with corridors
+    ConnectRooms(dungeon);
+    
+    // Clear corner blocks to make navigation easier at 90-degree turns
+    ClearCornerBlocks(dungeon);
+    
+    // Add doors at appropriate corridor locations
     AddDoors(dungeon);
     
     // Place start and end points
@@ -169,6 +153,9 @@ void GenerateDungeon(Dungeon* dungeon, int width, int height, int maxRooms, int 
     // Add some random traps and chests
     AddRandomTraps(dungeon, dungeon->width * dungeon->height / 100); // 1% of tiles are traps
     AddRandomChests(dungeon, maxRooms / 2); // 50% of max rooms have chests
+    
+    // Add decorative props (torches, barrels, crates, etc.)
+    AddDecorativeProps(dungeon);
 }
 
 // Create a horizontal corridor between x1 and x2 at y (now with adjustable width)
@@ -181,7 +168,7 @@ void CreateHorizontalCorridor(Dungeon* dungeon, int x1, int x2, int y) {
     }
     
     // Define corridor width (now double width)
-    int corridorWidth = 2; // Was previously 1 (implicit)
+    int corridorWidth = 3; // Increased by 25% for better navigation // Was previously 1 (implicit)
     
     // Create wider corridor
     for (int x = x1; x <= x2; x++) {
@@ -209,7 +196,7 @@ void CreateVerticalCorridor(Dungeon* dungeon, int y1, int y2, int x) {
     }
     
     // Define corridor width (now double width)
-    int corridorWidth = 2; // Was previously 1 (implicit)
+    int corridorWidth = 3; // Increased by 25% for better navigation // Was previously 1 (implicit)
     
     // Create wider corridor
     for (int y = y1; y <= y2; y++) {
@@ -263,6 +250,66 @@ void AddRandomTraps(Dungeon* dungeon, int count) {
             if (Vector3Distance(trapPos, dungeon->startPosition) > 5.0f && 
                 Vector3Distance(trapPos, dungeon->endPosition) > 5.0f) {
                 dungeon->tiles[x][y] = TILE_TRAP;
+            }
+        }
+    }
+}
+
+// Connect all rooms with corridors
+void ConnectRooms(Dungeon* dungeon) {
+    // This function ensures that all rooms are connected
+    // We'll use a minimum spanning tree approach to connect all rooms
+    for (int i = 0; i < dungeon->roomCount - 1; i++) {
+        // Get the center of current room
+        Room currentRoom = dungeon->rooms[i];
+        int currentCenterX = currentRoom.x + currentRoom.width / 2;
+        int currentCenterY = currentRoom.y + currentRoom.height / 2;
+        
+        // Connect to the next room
+        Room nextRoom = dungeon->rooms[i + 1];
+        int nextCenterX = nextRoom.x + nextRoom.width / 2;
+        int nextCenterY = nextRoom.y + nextRoom.height / 2;
+        
+        // Randomly choose horizontal-then-vertical or vertical-then-horizontal
+        if (GetRandomValue(0, 1) == 0) {
+            // Horizontal then vertical
+            CreateHorizontalCorridor(dungeon, currentCenterX, nextCenterX, currentCenterY);
+            CreateVerticalCorridor(dungeon, currentCenterY, nextCenterY, nextCenterX);
+        } else {
+            // Vertical then horizontal
+            CreateVerticalCorridor(dungeon, currentCenterY, nextCenterY, currentCenterX);
+            CreateHorizontalCorridor(dungeon, currentCenterX, nextCenterX, nextCenterY);
+        }
+        
+        // Mark rooms as connected
+        dungeon->rooms[i].connected = true;
+        dungeon->rooms[i + 1].connected = true;
+    }
+    
+    // Add a few extra corridors to create loops in the dungeon (about 30% more connections)
+    int extraConnections = dungeon->roomCount * 0.3;
+    for (int i = 0; i < extraConnections; i++) {
+        // Choose two random rooms
+        int roomA = GetRandomValue(0, dungeon->roomCount - 1);
+        int roomB = GetRandomValue(0, dungeon->roomCount - 1);
+        
+        // Make sure they're different rooms
+        if (roomA != roomB) {
+            Room roomAData = dungeon->rooms[roomA];
+            Room roomBData = dungeon->rooms[roomB];
+            
+            int roomACenterX = roomAData.x + roomAData.width / 2;
+            int roomACenterY = roomAData.y + roomAData.height / 2;
+            int roomBCenterX = roomBData.x + roomBData.width / 2;
+            int roomBCenterY = roomBData.y + roomBData.height / 2;
+            
+            // Randomly choose corridor pattern
+            if (GetRandomValue(0, 1) == 0) {
+                CreateHorizontalCorridor(dungeon, roomACenterX, roomBCenterX, roomACenterY);
+                CreateVerticalCorridor(dungeon, roomACenterY, roomBCenterY, roomBCenterX);
+            } else {
+                CreateVerticalCorridor(dungeon, roomACenterY, roomBCenterY, roomACenterX);
+                CreateHorizontalCorridor(dungeon, roomACenterX, roomBCenterX, roomBCenterY);
             }
         }
     }
@@ -513,6 +560,9 @@ void UnloadDungeon(Dungeon* dungeon) {
     // Unload textures
     UnloadTexture(dungeon->floorTexture);
     UnloadTexture(dungeon->wallTexture);
+    
+    // Unload decorative props
+    UnloadProps();
     UnloadTexture(dungeon->doorTexture);
     UnloadTexture(dungeon->stairsTexture);
     UnloadTexture(dungeon->trapTexture);
@@ -545,39 +595,78 @@ bool IsWalkable(Dungeon* dungeon, float x, float z, float radius) {
         return false;
     }
     
-    // Reduce the collision radius for better movement feel
-    float collisionRadius = radius * 0.85f;
-    
-    // We'll implement a more precise collision detection algorithm that checks
-    // multiple points around the player in a circular pattern
+    // Make the player collider smaller as requested
+    // Using a smaller percentage of the player's radius for collision
+    float collisionRadius = radius * 0.65f;
     
     // First check the center tile directly
     int centerX = (int)floorf(x);
     int centerZ = (int)floorf(z);
     
+    // Check if the center tile is a wall
     if (dungeon->tiles[centerX][centerZ] == TILE_WALL) {
         return false;
     }
     
-    // Define how many points to check around the circle
-    const int numPoints = 8;
+    // Define check points using a directionally-aware approach
+    // We'll create more check points in the south/east directions to fix the inconsistency
     
-    // Check points around the player in a circular pattern
-    for (int i = 0; i < numPoints; i++) {
-        // Calculate angle for this point
-        float angle = (float)i * (2.0f * PI / numPoints);
+    // Create a set of points to check around the player
+    // These points form a collision shape that's slightly larger to the south/east
+    // to address the directional inconsistency
+    
+    // Cardinal directions first (N, E, S, W)
+    float pointsToCheck[12][2] = {
+        // North direction
+        {x, z - collisionRadius},
+        // East direction (slightly extended)
+        {x + collisionRadius * 1.1f, z},
+        // South direction (slightly extended)
+        {x, z + collisionRadius * 1.1f},
+        // West direction
+        {x - collisionRadius, z},
+        // NE corner
+        {x + collisionRadius * 0.7f, z - collisionRadius * 0.7f},
+        // SE corner (extended)
+        {x + collisionRadius * 0.8f, z + collisionRadius * 0.8f},
+        // SW corner (extended)
+        {x - collisionRadius * 0.7f, z + collisionRadius * 0.8f},
+        // NW corner
+        {x - collisionRadius * 0.7f, z - collisionRadius * 0.7f},
+        // Additional south point
+        {x - collisionRadius * 0.3f, z + collisionRadius},
+        {x + collisionRadius * 0.3f, z + collisionRadius},
+        // Additional east point
+        {x + collisionRadius, z - collisionRadius * 0.3f},
+        {x + collisionRadius, z + collisionRadius * 0.3f}
+    };
+    
+    // Check each point for wall collision
+    for (int i = 0; i < 12; i++) {
+        float checkX = pointsToCheck[i][0];
+        float checkZ = pointsToCheck[i][1];
         
-        // Calculate offset from player position
-        float offsetX = cosf(angle) * collisionRadius;
-        float offsetZ = sinf(angle) * collisionRadius;
+        // Handle tile coordinate conversion differently based on direction
+        // This is key to fixing the directional inconsistency
+        int tileX, tileZ;
         
-        // Calculate world position to check
-        float checkX = x + offsetX;
-        float checkZ = z + offsetZ;
+        // Special handling for positive directions (south/east) to fix the clipping issue
+        // When moving in positive direction, we need to be more strict with collision detection
+        if (checkX > x) { // East direction
+            // For east direction, ceil the value slightly to expand collision boundary
+            tileX = (int)ceilf(checkX - 0.01f);
+        } else {
+            // For west direction, floor the value
+            tileX = (int)floorf(checkX);
+        }
         
-        // Convert to tile coordinates - use floorf to ensure proper rounding for negative values
-        int tileX = (int)floorf(checkX);
-        int tileZ = (int)floorf(checkZ);
+        if (checkZ > z) { // South direction
+            // For south direction, ceil the value slightly to expand collision boundary
+            tileZ = (int)ceilf(checkZ - 0.01f);
+        } else {
+            // For north direction, floor the value
+            tileZ = (int)floorf(checkZ);
+        }
         
         // Verify this point is within dungeon bounds
         if (tileX >= 0 && tileX < dungeon->width && 
@@ -590,32 +679,6 @@ bool IsWalkable(Dungeon* dungeon, float x, float z, float radius) {
         } else {
             // Point is outside dungeon bounds
             return false;
-        }
-    }
-    
-    // Additional check for handling corners better
-    // Check the four diagonal points at a slightly smaller radius
-    float cornerRadius = collisionRadius * 0.75f;
-    float diagonalOffset = cornerRadius * 0.7071f; // 0.7071 ≈ cos(45°) ≈ sin(45°)
-    
-    // Points to check for diagonal collisions
-    float cornerPoints[4][2] = {
-        {x + diagonalOffset, z + diagonalOffset}, // Top-right
-        {x - diagonalOffset, z + diagonalOffset}, // Top-left
-        {x + diagonalOffset, z - diagonalOffset}, // Bottom-right
-        {x - diagonalOffset, z - diagonalOffset}  // Bottom-left
-    };
-    
-    for (int i = 0; i < 4; i++) {
-        int tileX = (int)floorf(cornerPoints[i][0]);
-        int tileZ = (int)floorf(cornerPoints[i][1]);
-        
-        if (tileX >= 0 && tileX < dungeon->width && 
-            tileZ >= 0 && tileZ < dungeon->height) {
-            
-            if (dungeon->tiles[tileX][tileZ] == TILE_WALL) {
-                return false;
-            }
         }
     }
     

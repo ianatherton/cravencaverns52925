@@ -4,6 +4,7 @@
 #include "../include/enemy.h"
 #include "../include/item.h"
 #include "../include/ui.h"
+#include "../include/dungeon_props.h"
 #include "raymath.h"
 #include <stdlib.h>
 #include <stdio.h>
@@ -136,17 +137,23 @@ void UpdateGame(GameState* gameState, float deltaTime) {
                 }
                 
                 // Handle gravity and ground collision
-                if (newPosition.y < 0) {
-                    // Collision with ground
-                    gameState->player->position.y = 0;
+                // Note: Player model is effectively a capsule with height and radius
+                
+                // Calculate the proper standing height for the player based on collider
+                float standingHeight = gameState->player->height / 2.0f - gameState->player->radius;
+                
+                if (newPosition.y < standingHeight) {
+                    // Collision with ground - place player at proper height
+                    // This ensures consistent eye level when standing
+                    gameState->player->position.y = standingHeight;
                     gameState->player->isGrounded = true;
                     gameState->player->isJumping = false;
                 } else {
                     // Apply Y movement
                     gameState->player->position.y = newPosition.y;
                     
-                    // If player is going down and not at ground level, they're not grounded
-                    if (gameState->player->velocity.y < 0 && gameState->player->position.y > 0) {
+                    // If player is going down and above standing height, they're not grounded
+                    if (gameState->player->velocity.y < 0 && gameState->player->position.y > standingHeight) {
                         gameState->player->isGrounded = false;
                     }
                 }
@@ -352,6 +359,9 @@ void DrawGameplay(GameState* gameState) {
         
         // Draw the dungeon
         DrawDungeon(gameState->dungeon);
+        
+        // Draw decorative props
+        DrawDungeonProps(gameState->dungeon);
         
         // Draw enemies
         for (int i = 0; i < gameState->enemyCount; i++) {

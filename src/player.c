@@ -15,7 +15,7 @@ void InitPlayer(Player* player) {
     player->isJumping = false;
     player->isGrounded = true;
     player->height = 1.8f;
-    player->radius = 0.4f;
+    player->radius = 0.2f; // Reduced from 0.4f to make it easier to navigate through corners
     player->rotationAngle = 0.0f;
     
     // Set camera properties
