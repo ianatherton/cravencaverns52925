@@ -366,6 +366,9 @@ void LoadDungeonAssets(Dungeon* dungeon, int theme) {
     // Wall - increased height to 3.0f
     dungeon->wallModel = LoadModelFromMesh(GenMeshCube(1.0f, 3.0f, 1.0f));
     
+    // Ceiling - create a plane that will be positioned at the top of the walls
+    dungeon->ceilingModel = LoadModelFromMesh(GenMeshPlane(1.0f, 1.0f, 2, 2));
+    
     // Door - increased height to match walls
     dungeon->doorModel = LoadModelFromMesh(GenMeshCube(1.0f, 3.0f, 0.2f));
     
@@ -393,6 +396,9 @@ void LoadDungeonAssets(Dungeon* dungeon, int theme) {
     // Load floor texture
     dungeon->floorTexture = LoadTexture(floorTexturePath);
     
+    // Use wall texture for ceiling
+    dungeon->ceilingTexture = dungeon->wallTexture;
+    
     // If textures couldn't be loaded, create fallbacks
     if (dungeon->wallTexture.id == 0) {
         Image img = GenImageColor(128, 128, (Color){128, 128, 128, 255}); // Gray
@@ -405,6 +411,8 @@ void LoadDungeonAssets(Dungeon* dungeon, int theme) {
         dungeon->floorTexture = LoadTextureFromImage(img);
         UnloadImage(img);
     }
+    
+    // No need for ceiling texture fallback as we're using wall texture
     
     // Create fallback images for other textures
     Image img;
@@ -430,6 +438,7 @@ void LoadDungeonAssets(Dungeon* dungeon, int theme) {
     // Set material for each model
     dungeon->wallModel.materials[0].maps[MATERIAL_MAP_DIFFUSE].texture = dungeon->wallTexture;
     dungeon->floorModel.materials[0].maps[MATERIAL_MAP_DIFFUSE].texture = dungeon->floorTexture;
+    dungeon->ceilingModel.materials[0].maps[MATERIAL_MAP_DIFFUSE].texture = dungeon->ceilingTexture;
     dungeon->doorModel.materials[0].maps[MATERIAL_MAP_DIFFUSE].texture = dungeon->wallTexture; // Use wall texture for doors
     dungeon->stairsUpModel.materials[0].maps[MATERIAL_MAP_DIFFUSE].texture = dungeon->stairsTexture;
     dungeon->stairsDownModel.materials[0].maps[MATERIAL_MAP_DIFFUSE].texture = dungeon->stairsTexture;
@@ -452,6 +461,14 @@ void DrawDungeon(Dungeon* dungeon) {
                 case TILE_FLOOR:
                     // Draw floor
                     DrawModel(dungeon->floorModel, (Vector3){x, 0.0f, y}, 1.0f, WHITE);
+                    
+                    // Draw ceiling - rotated 180 degrees around X-axis to face downward
+                    DrawModelEx(dungeon->ceilingModel, 
+                               (Vector3){x, 3.0f, y}, 
+                               (Vector3){1.0f, 0.0f, 0.0f}, 
+                               180.0f, 
+                               (Vector3){1.0f, 1.0f, 1.0f}, 
+                               WHITE);
                     break;
                     
                 case TILE_WALL:
@@ -462,6 +479,14 @@ void DrawDungeon(Dungeon* dungeon) {
                 case TILE_DOOR:
                     // Draw floor under door
                     DrawModel(dungeon->floorModel, (Vector3){x, 0.0f, y}, 1.0f, WHITE);
+                    
+                    // Draw ceiling above door
+                    DrawModelEx(dungeon->ceilingModel, 
+                               (Vector3){x, 3.0f, y}, 
+                               (Vector3){1.0f, 0.0f, 0.0f}, 
+                               180.0f, 
+                               (Vector3){1.0f, 1.0f, 1.0f}, 
+                               WHITE);
                     
                     // Determine door orientation
                     bool isHorizontalCorridor = false;
@@ -493,6 +518,15 @@ void DrawDungeon(Dungeon* dungeon) {
                 case TILE_STAIRS_UP:
                     // Draw stairs up
                     DrawModel(dungeon->floorModel, (Vector3){x, 0.0f, y}, 1.0f, WHITE);
+                    
+                    // Draw ceiling above stairs
+                    DrawModelEx(dungeon->ceilingModel, 
+                               (Vector3){x, 3.0f, y}, 
+                               (Vector3){1.0f, 0.0f, 0.0f}, 
+                               180.0f, 
+                               (Vector3){1.0f, 1.0f, 1.0f}, 
+                               WHITE);
+                    
                     DrawModelEx(dungeon->stairsUpModel, 
                                (Vector3){x, 0.25f, y}, 
                                (Vector3){1.0f, 0.0f, 0.0f}, 
@@ -504,6 +538,15 @@ void DrawDungeon(Dungeon* dungeon) {
                 case TILE_STAIRS_DOWN:
                     // Draw stairs down
                     DrawModel(dungeon->floorModel, (Vector3){x, 0.0f, y}, 1.0f, WHITE);
+                    
+                    // Draw ceiling above stairs
+                    DrawModelEx(dungeon->ceilingModel, 
+                               (Vector3){x, 3.0f, y}, 
+                               (Vector3){1.0f, 0.0f, 0.0f}, 
+                               180.0f, 
+                               (Vector3){1.0f, 1.0f, 1.0f}, 
+                               WHITE);
+                    
                     DrawModelEx(dungeon->stairsDownModel, 
                                (Vector3){x, 0.25f, y}, 
                                (Vector3){1.0f, 0.0f, 0.0f}, 
@@ -516,12 +559,28 @@ void DrawDungeon(Dungeon* dungeon) {
                     // Draw floor with trap
                     DrawModel(dungeon->floorModel, (Vector3){x, 0.0f, y}, 1.0f, WHITE);
                     DrawModel(dungeon->trapModel, (Vector3){x, 0.01f, y}, 1.0f, WHITE);
+                    
+                    // Draw ceiling above trap
+                    DrawModelEx(dungeon->ceilingModel, 
+                               (Vector3){x, 3.0f, y}, 
+                               (Vector3){1.0f, 0.0f, 0.0f}, 
+                               180.0f, 
+                               (Vector3){1.0f, 1.0f, 1.0f}, 
+                               WHITE);
                     break;
                     
                 case TILE_CHEST:
                     // Draw floor with chest
                     DrawModel(dungeon->floorModel, (Vector3){x, 0.0f, y}, 1.0f, WHITE);
                     DrawModel(dungeon->chestModel, (Vector3){x, 0.25f, y}, 1.0f, WHITE);
+                    
+                    // Draw ceiling above chest
+                    DrawModelEx(dungeon->ceilingModel, 
+                               (Vector3){x, 3.0f, y}, 
+                               (Vector3){1.0f, 0.0f, 0.0f}, 
+                               180.0f, 
+                               (Vector3){1.0f, 1.0f, 1.0f}, 
+                               WHITE);
                     break;
                     
                 default:
@@ -551,6 +610,7 @@ void UnloadDungeon(Dungeon* dungeon) {
     // Unload models
     UnloadModel(dungeon->floorModel);
     UnloadModel(dungeon->wallModel);
+    UnloadModel(dungeon->ceilingModel); // Unload ceiling model
     UnloadModel(dungeon->doorModel);
     UnloadModel(dungeon->stairsUpModel);
     UnloadModel(dungeon->stairsDownModel);
@@ -560,6 +620,7 @@ void UnloadDungeon(Dungeon* dungeon) {
     // Unload textures
     UnloadTexture(dungeon->floorTexture);
     UnloadTexture(dungeon->wallTexture);
+    // Don't unload ceiling texture separately since it shares the wall texture
     
     // Unload decorative props
     UnloadProps();
